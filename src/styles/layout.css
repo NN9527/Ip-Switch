@@ -5,6 +5,8 @@
   margin-bottom: 16px;
   border: 1px solid var(--border-color);
   box-shadow: 0 10px 25px var(--shadow);
+  /* 固定头部，内容超长时只滚内容区 */
+  flex-shrink: 0;
 }
 
 .app-title {
@@ -34,6 +36,10 @@
   /* 右侧场景管理区：可随窗口变宽（避免最大化后仍固定 520px） */
   grid-template-columns: minmax(0, 1fr) clamp(520px, 38vw, 760px);
   gap: 16px;
+  /* 占据容器剩余高度，内部各列自己滚，避免整页滚动 */
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* 最大化时再进一步放宽右侧内容框 */
@@ -50,12 +56,25 @@ body.is-maximized .main-content {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  /* 高度不超出父级，内部 #network-info 独立滚动 */
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* 网卡列表：标题/筛选栏固定，列表自身滚动 */
+.network-section > #network-info {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .sidebar {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  /* 右侧场景区独立滚动 */
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .scenes-section {

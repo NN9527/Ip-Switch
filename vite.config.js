@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite';
-import { copyFileSync, mkdirSync, existsSync, cpSync } from 'fs';
-import { join } from 'path';
+import { copyFileSync, mkdirSync, existsSync, cpSync, createReadStream, statSync } from 'fs';
+import { join, extname } from 'path';
 
 // 判断是否是生产构建
 const isProduction = process.env.NODE_ENV === 'production' || !process.env.TAURI_DEBUG;
@@ -137,6 +137,42 @@ export default defineConfig({
           cpSync(imgsSource, imgsDest, { recursive: true });
         }
       }
+    },
+    // ------------------------------------------------------------------
+    // 开发模式（npm run dev）下把 /imgs/* 映射到项目根的 imgs/ 目录。
+    // 生产构建由上面的 copy-static-assets 负责复制进 dist；dev 模式没有
+    // publicDir，不加这个中间件的话图标在开发时全部 404（界面上一片空方块）。
+    // 仅在 dev 生效（apply: 'serve'），不影响构建产物。
+    // ------------------------------------------------------------------
+    {
+      name: 'serve-imgs-in-dev',
+      apply: 'serve',
+      configureServer(server) {
+        const imgsRoot = join(process.cwd(), 'imgs');
+        const MIME = {
+          '.svg': 'image/svg+xml',
+          '.png': 'image/png',
+          '.jpg': 'image/jpeg',
+          '.jpeg': 'image/jpeg',
+          '.gif': 'image/gif',
+          '.webp': 'image/webp',
+          '.ico': 'image/x-icon',
+        };
+        server.middlewares.use('/imgs', (req, res, next) => {
+          try {
+            const rel = decodeURIComponent((req.url || '/').split('?')[0]);
+            const file = join(imgsRoot, rel);
+            // 防目录穿越
+            if (!file.startsWith(imgsRoot)) return next();
+            if (!existsSync(file) || !statSync(file).isFile()) return next();
+            res.setHeader('Content-Type', MIME[extname(file).toLowerCase()] || 'application/octet-stream');
+            res.setHeader('Cache-Control', 'no-cache');
+            createReadStream(file).pipe(res);
+          } catch {
+            next();
+          }
+        });
+      },
     },
   ],
 });

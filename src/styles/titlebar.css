@@ -157,10 +157,16 @@ body {
   overflow: hidden;
 }
 
-/* 调整容器样式以适应自定义窗口 */
+/* 调整容器样式以适应自定义窗口
+   注意：container 不再是滚动容器。改为纵向 flex 且 overflow:hidden，
+   让 header 固定、main-content 内部各自滚动（见 layout.css）。
+   否则内容一长就整页滚，头部和右侧场景区会被一起滚出视野。 */
 .container {
   flex: 1;
-  overflow-y: auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   padding: 18px;
   max-width: 100%;
   margin: 0;
