@@ -68,7 +68,9 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "mt.exe 嵌入失败，退出码 $LASTEXITCODE" }
           $s = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($exe))
           if (-not $s.Contains('requireAdministrator')) { throw "校验失败：exe 中未发现 requireAdministrator" }
-          Write-Host "清单嵌入成功，已包含 requireAdministrator"
+          # 必须同时保留 Common-Controls 依赖，否则 TaskDialogIndirect 会找不到入口点
+          if (-not $s.Contains('Microsoft.Windows.Common-Controls')) { throw "校验失败：exe 中丢失了 Common-Controls 依赖声明" }
+          Write-Host "清单嵌入成功：已包含 requireAdministrator + Common-Controls"
 
       # ------------------------------------------------------------------
       # 防回归：前端产物必须能通过语法检查。

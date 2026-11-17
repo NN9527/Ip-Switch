@@ -7,6 +7,26 @@
     type="win32"
   />
   <description>IP 配置管理器</description>
+
+  <!--
+    必需：声明依赖 Common Controls v6。
+    注意：用 mt.exe -outputresource 嵌入清单时是【整体替换】RT_MANIFEST 资源，
+    如果这里不写这一节，Tauri/WebView2 依赖的 TaskDialogIndirect 等 API
+    会在启动时找不到入口点，报「无法定位程序输入点 TaskDialogIndirect」。
+  -->
+  <dependency>
+    <dependentAssembly>
+      <assemblyIdentity
+        type="win32"
+        name="Microsoft.Windows.Common-Controls"
+        version="6.0.0.0"
+        processorArchitecture="*"
+        publicKeyToken="6595b64144ccf1df"
+        language="*"
+      />
+    </dependentAssembly>
+  </dependency>
+
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
     <security>
       <requestedPrivileges>
