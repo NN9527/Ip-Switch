@@ -68,7 +68,8 @@ window.handleClose = async function(e) {
   }
   try {
     const window = await getWindow();
-    await window.hide();
+    // 点关闭直接退出应用（原先是 hide 到托盘，容易让用户以为程序没关掉）
+    await window.close();
   } catch (error) {
     console.error('关闭窗口失败:', error);
   }

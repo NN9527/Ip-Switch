@@ -1,7 +1,18 @@
 name: 构建 Windows 安装包
 
 on:
+  # 手动触发
   workflow_dispatch:
+  # 推送 main 分支时自动构建
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'src-tauri/**'
+      - 'index.html'
+      - 'vite.config.js'
+      - 'package.json'
+      - '.github/workflows/build-windows.yml'
 
 jobs:
   build:
@@ -26,24 +37,54 @@ jobs:
         with:
           workspaces: src-tauri
 
-      - name: 修正窗口尺寸（高 DPI 适配）
-        shell: pwsh
-        run: |
-          $p = 'src-tauri/tauri.conf.json'
-          $j = Get-Content $p -Raw
-          $j = $j -replace '"width":\s*1200', '"width": 1100'
-          $j = $j -replace '"height":\s*960', '"height": 760'
-          $j = $j -replace '"minWidth":\s*1200', '"minWidth": 860'
-          $j = $j -replace '"minHeight":\s*960', '"minHeight": 560'
-          Set-Content -Path $p -Value $j -NoNewline -Encoding utf8
-          Write-Host '--- 修改后的窗口配置 ---'
-          Select-String -Path $p -Pattern '"(min)?(Width|Height)"'
-
       - name: 安装前端依赖
         run: npm ci
 
-      - name: 构建 Tauri 应用（NSIS 安装包）
-        run: npx tauri build --bundles nsis
+      - name: 构建应用（不打包）
+        run: npx tauri build --no-bundle
+
+      # ------------------------------------------------------------------
+      # 原项目没有把 app.manifest 嵌进 exe（build.rs 只调了 tauri_build::build()），
+      # 程序启动时不会申请管理员权限。虽然修好 JS 后界面能正常加载，
+      # 但修改 IP / Hosts / 代理仍需管理员权限，这里用 Windows SDK 的 mt.exe
+      # 把要求管理员权限的清单嵌入 exe，之后双击即自动提权。
+      # ------------------------------------------------------------------
+      - name: 嵌入管理员权限清单
+        shell: pwsh
+        run: |
+          $exe = 'src-tauri/target/release/ip-switch.exe'
+          if (-not (Test-Path $exe)) { throw "未找到构建产物 $exe" }
+          $mt = Get-ChildItem "$($env:ProgramFiles)\Windows Kits\10\bin\*\x64\mt.exe" -ErrorAction SilentlyContinue |
+                Sort-Object FullName | Select-Object -Last 1
+          if (-not $mt) {
+            $mt = Get-ChildItem "$($env:ProgramFiles(x86))\Windows Kits\10\bin\*\x64\mt.exe" -ErrorAction SilentlyContinue |
+                  Sort-Object FullName | Select-Object -Last 1
+          }
+          if (-not $mt) { throw "未找到 mt.exe，无法嵌入清单" }
+          Write-Host "使用 mt.exe: $($mt.FullName)"
+          & $mt.FullName -nologo -manifest src-tauri/app.manifest -outputresource:"$exe;1"
+          if ($LASTEXITCODE -ne 0) { throw "mt.exe 嵌入失败，退出码 $LASTEXITCODE" }
+          $s = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($exe))
+          if (-not $s.Contains('requireAdministrator')) { throw "校验失败：exe 中未发现 requireAdministrator" }
+          Write-Host "清单嵌入成功，已包含 requireAdministrator"
+
+      # ------------------------------------------------------------------
+      # 防回归：前端产物必须能通过语法检查。
+      # 之前 vite.config.js 的 remove-console 正则插件把压缩后的 JS 删出了
+      # SyntaxError，导致整站 JS 不执行（网卡空白、按钮无响应）。
+      # ------------------------------------------------------------------
+      - name: 校验前端产物语法
+        shell: pwsh
+        run: |
+          $js = Get-ChildItem 'dist/assets/index-*.js' | Select-Object -First 1
+          if (-not $js) { throw "未找到前端产物" }
+          Write-Host "检查: $($js.Name) ($($js.Length) 字节)"
+          node --check $js.FullName
+          if ($LASTEXITCODE -ne 0) { throw "前端 JS 语法错误，构建产物不可用" }
+          Write-Host "前端 JS 语法检查通过"
+
+      - name: 打包 NSIS 安装包
+        run: npx tauri bundle --bundles nsis
 
       - name: 上传产物
         uses: actions/upload-artifact@v4

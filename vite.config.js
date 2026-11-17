@@ -36,7 +36,10 @@ export default defineConfig({
   plugins: [
     // 在生产构建时移除 console 语句的自定义插件
     // 在 generateBundle 阶段处理最终打包后的代码，确保所有 console 都被移除
-    ...(isProduction ? [{
+    // !! 已禁用 !! 下方 remove-console 插件用正则删除 console 语句，
+    // 会把压缩后相邻的表达式一起吃掉，产出 SyntaxError 的 JS 包
+    //（整站 JS 不执行：网卡不加载、按钮无响应）——esbuild 的 drop 已足够。
+    ...(false ? [{
       name: 'remove-console',
       generateBundle(options, bundle) {
         // 处理所有生成的 JS 文件

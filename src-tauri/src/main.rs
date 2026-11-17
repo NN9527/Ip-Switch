@@ -150,19 +150,9 @@ fn main() {
                 }
             });
 
-            // 监听窗口关闭事件，点击关闭按钮时隐藏到托盘而不是退出
-            if let Some(window) = app.get_webview_window("main") {
-                let window_clone = window.clone();
-                window.on_window_event(move |event| {
-                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                        // 阻止默认关闭行为
-                        api.prevent_close();
-                        // 隐藏窗口到托盘
-                        let _ = window_clone.hide();
-                    }
-                });
-            }
-
+            // 注意：不再拦截 CloseRequested。
+            // 原先点关闭按钮会 prevent_close 并隐藏到托盘，导致用户以为程序没关掉；
+            // 现改为遵循系统默认行为：关闭窗口即退出应用（托盘随进程一起结束）。
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
