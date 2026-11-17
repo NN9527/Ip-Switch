@@ -1,0 +1,56 @@
+name: 构建 Windows 安装包
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: 安装 Rust 稳定版
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust 编译缓存
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: 修正窗口尺寸（高 DPI 适配）
+        shell: pwsh
+        run: |
+          $p = 'src-tauri/tauri.conf.json'
+          $j = Get-Content $p -Raw
+          $j = $j -replace '"width":\s*1200', '"width": 1100'
+          $j = $j -replace '"height":\s*960', '"height": 760'
+          $j = $j -replace '"minWidth":\s*1200', '"minWidth": 860'
+          $j = $j -replace '"minHeight":\s*960', '"minHeight": 560'
+          Set-Content -Path $p -Value $j -NoNewline -Encoding utf8
+          Write-Host '--- 修改后的窗口配置 ---'
+          Select-String -Path $p -Pattern '"(min)?(Width|Height)"'
+
+      - name: 安装前端依赖
+        run: npm ci
+
+      - name: 构建 Tauri 应用（NSIS 安装包）
+        run: npx tauri build --bundles nsis
+
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: ip-switch-windows
+          path: |
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/ip-switch.exe
+          if-no-files-found: error
+          retention-days: 30
